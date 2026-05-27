@@ -1,31 +1,32 @@
-#include <pcap.h>
+ #include <pcap.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include <stdint.h>  //uint16_t,uint8_t 사용하기 위해 가져옴  uint8_t 1바이트 정수,uint16_t 2바이트 정수
-#include <arpa/inet.h>
-
-#define ETHER_ADDR_LEN 6
 
 struct libnet_ethernet_hdr {
-    uint8_t  ether_dhost[ETHER_ADDR_LEN];
-    uint8_t  ether_shost[ETHER_ADDR_LEN];
-    uint16_t ether_type;
+    unsigned char  ether_dhost[6];
+    unsigned char  ether_shost[6];
+    unsigned short ether_type;
 };
 
 struct libnet_ipv4_hdr {
-    uint8_t  ip_v_hl;
-    uint8_t  _pad1[8];
-    uint8_t  ip_p;
-    uint16_t _pad2;
-    struct in_addr ip_src, ip_dst;
+    unsigned char  ip_v_hl;
+    unsigned char  _pad1[8];
+    unsigned char  ip_p;
+    unsigned char  _pad2[2];
+    unsigned char  ip_src[4];
+    unsigned char  ip_dst[4];
 };
 
 struct libnet_tcp_hdr {
-    uint16_t th_sport;
-    uint16_t th_dport;
-    uint8_t  _pad1[8];
-    uint8_t  th_x2_off;
+    unsigned short th_sport;
+    unsigned short th_dport;
+    unsigned char  _pad1[8];
+    unsigned char  th_x2_off;
 };
+
+unsigned short my_ntohs(unsigned short n) {
+    return ((n & 0xFF00) >> 8) | ((n & 0x00FF) << 8);
+}
 
 void usage() {
     printf("syntax: pcap-test <interface>\n");
@@ -71,16 +72,16 @@ int main(int argc, char* argv[]) {
         }
 
         struct libnet_ethernet_hdr* eth = (struct libnet_ethernet_hdr*)packet;
-        if (ntohs(eth->ether_type) != 0x0800) continue;
+        if (my_ntohs(eth->ether_type) != 0x0800) continue;
 
         struct libnet_ipv4_hdr* ip = (struct libnet_ipv4_hdr*)(packet + 14);
         if (ip->ip_p != 6) continue;
 
         int ip_len = (ip->ip_v_hl & 0x0F) * 4;
-        struct libnet_tcp_hdr* tcp = (struct libnet_tcp_hdr*)((uint8_t*)ip + ip_len);
+        struct libnet_tcp_hdr* tcp = (struct libnet_tcp_hdr*)((unsigned char*)ip + ip_len);
 
         int tcp_len = ((tcp->th_x2_off & 0xF0) >> 4) * 4;
-        const uint8_t* payload = (const uint8_t*)tcp + tcp_len;
+        const unsigned char* payload = (const unsigned char*)tcp + tcp_len;
         int payload_len = header->caplen - (14 + ip_len + tcp_len);
 
         printf("==========Ethernet Header==========\n");
@@ -88,12 +89,12 @@ int main(int argc, char* argv[]) {
         printf("Src Mac : %02x:%02x:%02x:%02x:%02x:%02x\n", eth->ether_shost[0], eth->ether_shost[1], eth->ether_shost[2], eth->ether_shost[3], eth->ether_shost[4], eth->ether_shost[5]);
 
         printf("==========IP Header==========\n");
-        printf("Src IP : %s\n", inet_ntoa(ip->ip_src));
-        printf("Dst IP : %s\n", inet_ntoa(ip->ip_dst));
+        printf("Src IP : %d.%d.%d.%d\n", ip->ip_src[0], ip->ip_src[1], ip->ip_src[2], ip->ip_src[3]);
+        printf("Dst IP : %d.%d.%d.%d\n", ip->ip_dst[0], ip->ip_dst[1], ip->ip_dst[2], ip->ip_dst[3]);
 
         printf("==========TCP Header==========\n");
-        printf("Src Port : %d\n", ntohs(tcp->th_sport));
-        printf("Dst Port : %d\n", ntohs(tcp->th_dport));
+        printf("Src Port : %d\n", my_ntohs(tcp->th_sport));
+        printf("Dst Port : %d\n", my_ntohs(tcp->th_dport));
 
         int print_len = (payload_len > 20) ? 20 : payload_len;
         if (print_len <= 0) {
