@@ -1,7 +1,7 @@
 #include <pcap.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include <stdint.h>
+#include <stdint.h>  //uint16_t,uint8_t 사용하기 위해 가져옴  uint8_t 1바이트 정수,uint16_t 2바이트 정수
 #include <arpa/inet.h>
 
 #define ETHER_ADDR_LEN 6
